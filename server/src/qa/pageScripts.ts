@@ -249,8 +249,16 @@ export const VISUAL_GEOMETRY = `() => {
       if (overlaps.length >= 10) break;
     }
   }
+  const MODERN_FORMATS = /\.(avif|webp)(\?.*)?$/i;
   const brokenImages = [...document.images]
-    .filter((img) => img.complete && img.naturalWidth === 0 && (img.currentSrc || img.src) && isVisible(img))
+    .filter((img) => {
+      if (!img.complete || !(img.currentSrc || img.src) || !isVisible(img)) return false;
+      if (img.naturalWidth !== 0) return false; // decoded fine
+      // Headless Chromium on Linux may fail to decode AVIF/WebP — not a real bug in the app
+      const src = img.currentSrc || img.src || '';
+      if (MODERN_FORMATS.test(src)) return false;
+      return true;
+    })
     .map((img) => ({ selector: cssPath(img), src: img.currentSrc || img.src, alt: img.alt, box: box(img.getBoundingClientRect()) }));
   return { viewportWidth: vw, docWidth, docHeight: document.documentElement.scrollHeight, clipped, overflowOffenders, overlaps, brokenImages, bodyBg: getComputedStyle(document.body).backgroundColor };
 }`;

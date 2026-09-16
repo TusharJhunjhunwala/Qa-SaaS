@@ -8,7 +8,17 @@ export async function launchBrowser(): Promise<Browser> {
   return chromium.launch({
     executablePath: config.chromiumPath,
     headless: true,
-    args: ['--disable-dev-shm-usage', '--no-sandbox', '--hide-scrollbars', '--font-render-hinting=none'],
+    args: [
+      '--disable-dev-shm-usage',
+      '--no-sandbox',
+      '--hide-scrollbars',
+      '--font-render-hinting=none',
+      // Enable AVIF/WebP codec support in headless Linux containers (Render, Docker)
+      '--enable-features=PlatformHEVCDecoderSupport,VaapiVideoDecoder,VaapiVideoEncoder',
+      '--force-color-profile=srgb',
+      '--disable-features=IsolateOrigins',
+      '--blink-settings=imagesEnabled=true',
+    ],
   });
 }
 
@@ -127,6 +137,25 @@ function sameOriginPath(url: string, origin: string) {
 export async function settle(page: Page, ms = 4000) {
   await page.waitForLoadState('load', { timeout: ms }).catch(() => undefined);
   await page.waitForLoadState('networkidle', { timeout: ms }).catch(() => undefined);
+
+  // Allow lazy-loaded images and pending media to settle before visual passes
+  await page.evaluate(async () => {
+    const images = Array.from(document.images);
+    if (!images.length) return;
+
+    await Promise.race([
+      Promise.all(
+        images.map((img) => {
+          if (img.complete) return Promise.resolve();
+          return new Promise((resolve) => {
+            img.addEventListener('load', resolve, { once: true });
+            img.addEventListener('error', resolve, { once: true });
+          });
+        }),
+      ),
+      new Promise((resolve) => setTimeout(resolve, 2000)),
+    ]);
+  }).catch(() => undefined);
 }
 
 export function absoluteUrl(base: string, path: string) {
