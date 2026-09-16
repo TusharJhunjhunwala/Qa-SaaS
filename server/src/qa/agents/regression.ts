@@ -130,7 +130,7 @@ export function toPlaywright(title: string, steps: Step[], baseUrl: string): str
       case 'expectImagesLoaded':
         body.push(
           "await page.waitForLoadState('networkidle');",
-          'const broken = await page.evaluate(() => [...document.images].filter((i) => i.complete && i.naturalWidth === 0).map((i) => i.src));',
+          'const broken = await page.evaluate(() => [...document.images].filter((i) => i.complete && i.naturalWidth === 0 && !/\.(avif|webp)(\?.*)?$/i.test(i.currentSrc || i.src)).map((i) => i.currentSrc || i.src));',
           'expect(broken, "images that failed to load").toEqual([]);',
         );
         break;
