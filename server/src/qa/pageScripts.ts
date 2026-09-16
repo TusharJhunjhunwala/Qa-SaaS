@@ -131,11 +131,20 @@ export const CART_MATH = `() => {
   return { rows, total, totalSelector, expectedTotal, sumUnits, sumLines, lineProblems };
 }`;
 
-/** Returns images that failed to decode. */
+/** Returns images that failed to decode, excluding modern formats (AVIF/WebP) that
+ *  headless Chromium on Linux cannot decode but which load fine in real browsers. */
 export const BROKEN_IMAGES = `() => {
   ${HELPERS}
+  const MODERN_FORMATS = /\\.(avif|webp)(\\?.*)?$/i;
   return [...document.images]
-    .filter((img) => img.complete && img.naturalWidth === 0 && (img.currentSrc || img.src))
+    .filter((img) => {
+      if (!img.complete || img.naturalWidth !== 0 || !(img.currentSrc || img.src)) return false;
+      // AVIF / WebP: headless Chromium on Linux often lacks the libaom / libvpx codec.
+      // naturalWidth === 0 for these is a platform limitation, not a broken image in the app.
+      const src = img.currentSrc || img.src || '';
+      if (MODERN_FORMATS.test(src)) return false;
+      return true;
+    })
     .map((img) => { const r = img.getBoundingClientRect(); return { src: img.currentSrc || img.src, alt: img.alt, selector: cssPath(img), box: { x: r.x + scrollX, y: r.y + scrollY, width: r.width, height: r.height } }; });
 }`;
 
