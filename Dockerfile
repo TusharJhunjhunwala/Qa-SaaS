@@ -10,7 +10,7 @@ FROM node:22-bookworm-slim
 ENV NODE_ENV=production PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 WORKDIR /app/server
 COPY server/package*.json ./
-RUN npm ci && npx playwright-core install --with-deps chromium && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-liberation fonts-noto-color-emoji && npm ci && npx playwright-core install --with-deps chromium && rm -rf /var/lib/apt/lists/*
 COPY server/ ./
 COPY --from=web /app/web/dist /app/web/dist
 ENV WEB_DIST=/app/web/dist STORAGE_DIR=/data/storage PORT=4000

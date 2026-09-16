@@ -234,6 +234,13 @@ export async function runVisionAgent(ctx: RunContext, browser: Browser, plan: Te
         if (target.setup.length) await executeSteps(ip, target.setup, { baseUrl: ctx.appUrl, stopOnFailure: false });
         await ip.page.goto(new URL(target.path, ctx.appUrl).toString(), { waitUntil: 'load' });
         await settle(ip.page);
+        // Scroll page to trigger IntersectionObservers and lazy loaders before visual checks
+        await ip.page.evaluate(async () => {
+          window.scrollTo(0, document.body.scrollHeight);
+          await new Promise((r) => setTimeout(r, 300));
+          window.scrollTo(0, 0);
+        }).catch(() => undefined);
+        await settle(ip.page, 3000);
         await ip.page.evaluate('document.fonts && document.fonts.ready').catch(() => undefined);
         await ip.page.waitForTimeout(250);
         const geo = await runInPage<Geometry>(ip.page, VISUAL_GEOMETRY);

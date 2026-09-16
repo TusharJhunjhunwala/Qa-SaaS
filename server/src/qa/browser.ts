@@ -11,12 +11,10 @@ export async function launchBrowser(): Promise<Browser> {
     args: [
       '--disable-dev-shm-usage',
       '--no-sandbox',
+      '--disable-gpu',
       '--hide-scrollbars',
       '--font-render-hinting=none',
-      // Enable AVIF/WebP codec support in headless Linux containers (Render, Docker)
-      '--enable-features=PlatformHEVCDecoderSupport,VaapiVideoDecoder,VaapiVideoEncoder',
       '--force-color-profile=srgb',
-      '--disable-features=IsolateOrigins',
       '--blink-settings=imagesEnabled=true',
     ],
   });
@@ -138,22 +136,31 @@ export async function settle(page: Page, ms = 4000) {
   await page.waitForLoadState('load', { timeout: ms }).catch(() => undefined);
   await page.waitForLoadState('networkidle', { timeout: ms }).catch(() => undefined);
 
-  // Allow lazy-loaded images and pending media to settle before visual passes
+  // Force lazy-loaded images to eager and allow media to settle
   await page.evaluate(async () => {
     const images = Array.from(document.images);
+    for (const img of images) {
+      if (img.getAttribute('loading') === 'lazy') {
+        img.removeAttribute('loading');
+        img.loading = 'eager';
+      }
+    }
     if (!images.length) return;
 
     await Promise.race([
       Promise.all(
         images.map((img) => {
-          if (img.complete) return Promise.resolve();
+          if (img.complete && img.naturalWidth !== 0) return Promise.resolve();
+          if (typeof img.decode === 'function') {
+            return img.decode().catch(() => undefined);
+          }
           return new Promise((resolve) => {
             img.addEventListener('load', resolve, { once: true });
             img.addEventListener('error', resolve, { once: true });
           });
         }),
       ),
-      new Promise((resolve) => setTimeout(resolve, 2000)),
+      new Promise((resolve) => setTimeout(resolve, 3500)),
     ]);
   }).catch(() => undefined);
 }

@@ -165,7 +165,9 @@ export function describeCluster(c: Cluster): BugDraft {
         likelyCause = 'Reported by the vision model — review the annotated screenshot.';
     }
   } else if (c.key.startsWith('page-error:')) {
-    title = `JavaScript error on ${functional?.page}: ${String(functional?.actual).slice(0, 80)}`;
+    const pageErr = (functional?.details?.failures as { symptom: string; actual?: string }[] | undefined)?.find((x) => x.symptom === 'page_error')?.actual;
+    const msg = pageErr || (functional?.console?.[0]?.text) || (functional?.actual);
+    title = `JavaScript error on ${functional?.page}: ${String(msg).slice(0, 80)}`;
     likelyCause = 'Uncaught exception in client-side code.';
   } else if (functional) {
     const data = (functional.details?.failures as { symptom: string; data?: Record<string, number | string[]> }[] | undefined)?.find((x) => x.symptom === functional.symptom)?.data;

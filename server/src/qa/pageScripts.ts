@@ -136,13 +136,23 @@ export const CART_MATH = `() => {
 export const BROKEN_IMAGES = `() => {
   ${HELPERS}
   const MODERN_FORMATS = /\\.(avif|webp)(\\?.*)?$/i;
+  const isModern = (img) => {
+    const src = img.currentSrc || img.src || '';
+    if (MODERN_FORMATS.test(src)) return true;
+    if (img.parentElement && img.parentElement.tagName.toLowerCase() === 'picture') {
+      const sources = img.parentElement.querySelectorAll('source');
+      for (const s of sources) {
+        if (MODERN_FORMATS.test(s.srcset || '') || /image\\/(avif|webp)/i.test(s.type || '')) return true;
+      }
+    }
+    return false;
+  };
   return [...document.images]
     .filter((img) => {
       if (!img.complete || img.naturalWidth !== 0 || !(img.currentSrc || img.src)) return false;
       // AVIF / WebP: headless Chromium on Linux often lacks the libaom / libvpx codec.
       // naturalWidth === 0 for these is a platform limitation, not a broken image in the app.
-      const src = img.currentSrc || img.src || '';
-      if (MODERN_FORMATS.test(src)) return false;
+      if (isModern(img)) return false;
       return true;
     })
     .map((img) => { const r = img.getBoundingClientRect(); return { src: img.currentSrc || img.src, alt: img.alt, selector: cssPath(img), box: { x: r.x + scrollX, y: r.y + scrollY, width: r.width, height: r.height } }; });
@@ -259,13 +269,23 @@ export const VISUAL_GEOMETRY = `() => {
     }
   }
   const MODERN_FORMATS = /\.(avif|webp)(\?.*)?$/i;
+  const isModern = (img) => {
+    const src = img.currentSrc || img.src || '';
+    if (MODERN_FORMATS.test(src)) return true;
+    if (img.parentElement && img.parentElement.tagName.toLowerCase() === 'picture') {
+      const sources = img.parentElement.querySelectorAll('source');
+      for (const s of sources) {
+        if (MODERN_FORMATS.test(s.srcset || '') || /image\/(avif|webp)/i.test(s.type || '')) return true;
+      }
+    }
+    return false;
+  };
   const brokenImages = [...document.images]
     .filter((img) => {
       if (!img.complete || !(img.currentSrc || img.src) || !isVisible(img)) return false;
       if (img.naturalWidth !== 0) return false; // decoded fine
       // Headless Chromium on Linux may fail to decode AVIF/WebP — not a real bug in the app
-      const src = img.currentSrc || img.src || '';
-      if (MODERN_FORMATS.test(src)) return false;
+      if (isModern(img)) return false;
       return true;
     })
     .map((img) => ({ selector: cssPath(img), src: img.currentSrc || img.src, alt: img.alt, box: box(img.getBoundingClientRect()) }));

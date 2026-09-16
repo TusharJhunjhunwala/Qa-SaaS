@@ -76,7 +76,7 @@ async function waitForPredicate(fn: () => Promise<boolean>, timeoutMs: number) {
   return fn().catch(() => false);
 }
 
-const IGNORABLE_CONSOLE = /Failed to load resource|favicon|net::ERR_ABORTED|Download the React DevTools/i;
+const IGNORABLE_CONSOLE = /Failed to load resource|favicon|net::ERR_ABORTED|Download the React DevTools|Unauthorized|status of 401/i;
 
 /**
  * Executes declarative steps. Browser steps need `ip`; request steps use Playwright's APIRequestContext.
@@ -197,10 +197,20 @@ export async function executeSteps(ip: Instrumented | null, steps: Step[], opts:
         }
         case 'expectImagesLoaded': {
           const p = needPage();
-          await p.evaluate('window.scrollTo(0, document.body.scrollHeight)').catch(() => undefined);
-          await settle(p, 2500);
+          await p.evaluate(async () => {
+            document.querySelectorAll('img[loading="lazy"]').forEach((img) => {
+              img.removeAttribute('loading');
+              (img as HTMLImageElement).loading = 'eager';
+            });
+            window.scrollTo(0, document.body.scrollHeight);
+            await new Promise((r) => setTimeout(r, 200));
+            window.scrollTo(0, 0);
+          }).catch(() => undefined);
+          await settle(p, 3000);
           const broken = await runInPage<{ src: string; alt: string; selector: string; box: unknown }[]>(p, BROKEN_IMAGES);
-          const failedImgs = (ip?.network.slice(mark.network) || []).filter((n) => n.resourceType === 'image' && (n.status >= 400 || n.status === 0));
+          const failedImgs = (ip?.network.slice(mark.network) || []).filter(
+            (n) => n.resourceType === 'image' && (n.status >= 400 || (n.status === 0 && n.responseSnippet && !/ERR_ABORTED/i.test(n.responseSnippet))),
+          );
           if (broken.length || failedImgs.length) {
             const src = broken[0]?.src || failedImgs[0]?.url;
             const status = failedImgs.find((f) => src && f.url === src)?.status ?? failedImgs[0]?.status;
